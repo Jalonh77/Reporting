@@ -1,0 +1,270 @@
+---
+title: "MDE Report Q1 2025"
+format: html
+editor: visual
+author: Jalon Howard
+
+last_updated: 03/27/2025
+---
+
+## I. Summary
+
+-   **Report Name:** Michigan Department of Education (MDE) Report
+
+-   **Frequency**: Quarterly
+
+-   **Scope**
+
+    -   [Timeframe]{.underline}: Previous quarter [and]{.underline} cumulative to-date
+
+    -   [Population]{.underline}: Schools that launched (i.e had at least one trainee complete a core training type) under 31p2 contract.
+
+-   **Deadline**: 2 weeks following end of Quarter
+
+    -   Q1 2025: April 10
+
+-   **Output Metrics:**
+
+    -   Number of schools implementing TRAILS in any Tier
+
+    -   Number of students who gained access to TRAILS resources and supports 
+
+    -   Number of staff trained by Tier (can be counted duplicatively and cumulatively)
+
+        -   Staff may be counted more than once when participating in more than one tier of programming
+
+-   **Date Sources**
+
+    -   [List of MDE Schools]{.underline} -\> Salesforce Contract Implementations with Account info & Core Training Launch Date filtered where contract contains '31p2' and by appropriate date parameters
+
+    -   [Trainings by Tier]{.underline} -\> Salesforce Training Affiliations filtered by [List of MDE Schools]{.underline}
+
+    -   [Student Access Data]{.underline} -\> [National Center for Education Statistics (NCES) search](https://nces.ed.gov/ccd/schoolsearch/) with the following criteria:
+
+        -   State: "Michigan"
+
+        -   School Description: "Regular, Special Education, Vocational, Other/Alternative"
+
+### Environment
+
+```{r}
+library(pacman)
+p_load(qualtRics, tidyverse, dplyr, janitor)
+
+dir_in <- '/Users/jalonr77/Documents/Evaluation Projects/Git Projects/Reporting/MDE Report/Data/Raw/'
+dir_out <- '/Users/jalonr77/Documents/Evaluation Projects/Git Projects/Reporting/MDE Report/Data/Out/'
+```
+
+### Data In
+
+```{r}
+# Files In
+file_in_sf_affiliations <- paste0(dir_in,'sf_export_affiliations_all_20250408.csv')
+file_in_sf_mde_schools <- paste0(dir_in,'sf_export_mde_schools_q1_2025_20250408.csv')
+file_in_nces_schools <- paste0(dir_in,'ncesdata_schools_mi_20250331.csv')
+
+
+df_affiliations <- clean_names(read_csv(file_in_sf_affiliations, show_col_types = FALSE))
+df_mde_schools <- clean_names(read_csv(file_in_sf_mde_schools, show_col_types = FALSE))
+df_nces <- clean_names(read_csv(file_in_nces_schools, show_col_types = FALSE))
+```
+
+### Data Out
+
+```{r}
+
+# Auto-update date suffix for file-out names
+date_suff <- str_remove_all(as.character(today()), "-")
+
+```
+
+## III. Execute
+
+```{r}
+df_affiliations
+df_mde_schools
+df_nces
+```
+
+```{r}
+
+# list of mde schools 
+list_mde_school_codes <- unique(df_mde_schools$account_entity_code)
+
+```
+
+### Trainees
+
+```{r}
+df_affiliations
+colnames(df_affiliations)
+```
+
+```{r}
+
+# List of qualified trainings
+dict_mde_role <- list(
+  'SEL Curriculum Training' = 'T1_Staff',
+  'SEL Recording + Live Q&A' = 'T1_Staff',
+  'SEL Q+A' = 'T1_Staff',
+  'SEL Facilitated' = 'T1_Staff',
+  'SEL Asynchronous' = 'T1_Staff',
+  'SMHP CBT Training' = 'T2_SMHP',
+  'Suicide Prevention - ISD' = 'T3_Admin', 
+  'Suicide Prevention - School Staff' = 'T3_Educator', 
+  'Suicide Prevention - SMHP' = 'T3_SMHP', 
+  'Suicide Prevention - Community' = 'T3_Community', 
+  'Suicide Risk Management Protocol' = 'T3_Both_Admin_SMHP'
+)
+names(dict_mde_role)
+```
+
+```{r}
+
+df_affiliations_wrangled <- df_affiliations %>%
+  rename(
+    aff_id = name,
+    attendance_id = training_attendance_c,
+    training_date = training_attendance_r_actual_completion_date,
+    completion_status = training_attendance_r_disbursement_status,
+    training_name = training_attendance_r_benefit_assignment_benefit_name,
+    training_tier = training_attendance_r_program_enrollment_program_tier_c,
+    aff_account_id = account_c,
+    aff_name = account_r_name,
+    aff_entity_code = entity_code_c,
+    attendee_account_id = attendee_r_id
+  ) %>%
+  filter(
+    # Affiliated to mde school
+    aff_entity_code %in% list_mde_school_codes,
+    # Training was completed
+    !(completion_status %in% c('Scheduled','Absent')),
+    # Within Q1 period
+    between(training_date, 
+            left = date('2025-01-01'), 
+            right = date('2025-03-31')),
+    # Qualifying training
+   training_name %in% names(dict_mde_role) 
+  ) %>%
+  mutate(
+    mde_role = case_when(
+        training_name %in% c('SEL Curriculum Training',
+                             'SEL Recording + Live Q&A',
+                             'SEL Q+A',
+                             'SEL Facilitated',
+                             'SEL Asynchronous') ~ 'T1_Staff',
+        
+        training_name == 'SMHP CBT Training' ~ 'T2_SMHP',
+        training_name == 'CIT CBT Training”' ~ 'T2_CIT',
+        
+        training_name == 'Suicide Prevention - ISD' ~ 'T3_Admin', 
+        training_name == 'Suicide Prevention - School Staff' ~ 'T3_Educator', 
+        training_name == 'Suicide Prevention - SMHP' ~ 'T3_SMHP', 
+        training_name == 'Suicide Prevention - Community' ~ 'T3_Community', 
+        training_name == 'Suicide Risk Management Protocol' ~ 'T3_Both_Admin_SMHP'
+    )
+
+  )
+
+df_affiliations_wrangled
+
+# OUTPUT: Frequeny table of Trainees by type
+freq_table_trainees <- table(df_affiliations_wrangled$mde_role)
+
+cat('Number of Trainees\n')
+for(x in names(freq_table_trainees))({
+  cat(x,': ',freq_table_trainees[x],'\n',sep="")
+})
+
+```
+
+### Schools
+
+```{r}
+# Group affiliations by school and determine which tiers of programming occured
+df_affiliations_grouped_by_account <- df_affiliations_wrangled %>%
+  group_by(aff_entity_code) %>%
+  summarise(
+    is_t1 = sum(training_tier=='Tier 1') > 0,
+    is_t2 = sum(training_tier=='Tier 2') > 0,
+    is_t3 = sum(training_tier=='Tier 3') > 0
+  )
+
+
+# OUTPUT: Total number of Tier 1 Schools 
+n_schools_t1 <- df_affiliations_grouped_by_account %>%
+  filter(is_t1) %>%
+  nrow()
+
+# OUTPUT: Total number of Tier 2 Schools 
+n_schools_t2 <- df_affiliations_grouped_by_account %>%
+  filter(is_t2) %>%
+  nrow()
+
+# OUTPUT: Total number of Tier 3 Schools 
+n_schools_t3 <- df_affiliations_grouped_by_account %>%
+  filter(is_t3) %>%
+  nrow()
+
+# OUTPUT: Total number of Schools implementing in any tier (Non-duplicative) 
+n_schools_total <- nrow(df_affiliations_grouped_by_account)
+
+# Visual Check of DF
+df_affiliations_grouped_by_account
+
+# Print Output
+cat('Number of Implementing Schools\n',
+    'Tier 1: ',n_schools_t1,'\n',
+    'Tier 2: ',n_schools_t2,'\n',
+    'Tier 3: ',n_schools_t3,'\n',
+    'Any Tier: ',n_schools_total,'\n')
+
+```
+
+### Student Access
+
+```{r}
+
+# Tier 1 & 2
+df_student_reach <- df_affiliations_grouped_by_account %>%
+  left_join(x=.,
+            y=df_nces[c('state_school_id', 'students')],
+            by=c('aff_entity_code'= 'state_school_id'),
+            na_matches='never')
+
+df_student_reach
+
+# Only include certain Tier 3 training when calculating student access
+df_student_reach_t3 <- df_affiliations_wrangled %>%
+  filter(
+    training_name %in% c('Suicide Prevention - ISD', 'Suicide Risk Management Protocol', 'Suicide Prevention - SMHP')
+  ) %>%
+  group_by(aff_entity_code) %>%
+  summarise(
+        is_t3 = sum(training_tier=='Tier 3') > 0
+  ) %>%
+  left_join(x=.,
+            y=df_nces[c('state_school_id', 'students')],
+            by=c('aff_entity_code'= 'state_school_id'),
+            na_matches='never')
+
+df_student_reach_t3
+
+# OUTPUT: Tier 1 Reach 
+n_t1_reach <- sum(as.integer(df_student_reach$students[df_student_reach$is_t1==TRUE & is.na(df_student_reach$students)==FALSE]))
+
+# OUTPUT: Tier 2 Reach
+n_t2_reach <- sum(as.integer(df_student_reach$students[df_student_reach$is_t2==TRUE & is.na(df_student_reach$students)==FALSE]))
+
+# OUTPUT: Tier 3 Reach
+n_t3_reach <- sum(as.integer(df_student_reach_t3$students[df_student_reach_t3$is_t3==TRUE & is.na(df_student_reach_t3$students)==FALSE]))
+
+# OUTPUT: Overall Reach (Duplicative)
+n_reach_total <- sum(n_t1_reach, n_t2_reach, n_t3_reach)
+
+cat('Student Access\n',
+    'Tier 1: ',n_t1_reach,'\n',
+    'Tier 2: ',n_t2_reach,'\n',
+    'Tier 3: ',n_t3_reach,'\n',
+    'Any Tier: ',n_reach_total,'\n')
+```
