@@ -81,7 +81,6 @@ date_suff <- str_remove_all(as.character(today()), "-")
 ## III. Execute
 
 ```{r}
-df_affiliations
 df_mde_schools
 df_nces
 ```
@@ -102,7 +101,7 @@ colnames(df_affiliations)
 
 ```{r}
 
-# List of qualified trainings
+# Dictionary of qualified trainings and corresponding MDE Role
 dict_mde_role <- list(
   'SEL Curriculum Training' = 'T1_Staff',
   'SEL Recording + Live Q&A' = 'T1_Staff',
@@ -116,7 +115,6 @@ dict_mde_role <- list(
   'Suicide Prevention - Community' = 'T3_Community', 
   'Suicide Risk Management Protocol' = 'T3_Both_Admin_SMHP'
 )
-names(dict_mde_role)
 ```
 
 ```{r}
@@ -181,6 +179,7 @@ for(x in names(freq_table_trainees))({
 ### Schools
 
 ```{r}
+
 # Group affiliations by school and determine which tiers of programming occured
 df_affiliations_grouped_by_account <- df_affiliations_wrangled %>%
   group_by(aff_entity_code) %>%
