@@ -94,6 +94,7 @@ dict_mde_role <- list(
   # Tier 2 SMHP Trainings has different Schedule name different than Training name
   'CBT & Mindfulness Training' = 'T2_SMHP',
   'SMHP CBT Training' = 'T2_SMHP',
+  'CIT CBT Training' = 'T2_CIT',
   'Suicide Prevention - ISD' = 'T3_Admin', 
   'Suicide Prevention - School Staff' = 'T3_Educator', 
   'Suicide Prevention - SMHP' = 'T3_SMHP', 
@@ -180,7 +181,6 @@ df_affiliations_wrangled <- df_affiliations %>%
         training_name == 'CBT & Mindfulness Training' ~ 'T2_SMHP',
         training_name == 'SMHP CBT Training' ~ 'T2_SMHP',
         training_name == 'CIT CBT Training' ~ 'T2_CIT',
-        
         training_name == 'Suicide Prevention - ISD' ~ 'T3_Admin', 
         training_name == 'Suicide Prevention - School Staff' ~ 'T3_Educator', 
         training_name == 'Suicide Prevention - SMHP' ~ 'T3_SMHP', 
