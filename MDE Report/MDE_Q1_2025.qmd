@@ -9,8 +9,6 @@ last_updated: 04/10/2025
 
 ## ø. To-Do
 
--   Check in SF that 'Training' names align with 'Training Schedule' names
-
 ## I. Summary
 
 -   **Report Name:** Michigan Department of Education (MDE) Report
